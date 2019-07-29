@@ -751,6 +751,7 @@ NvmExpressDriverBindingSupported (
   EFI_PCI_IO_PROTOCOL       *PciIo;
   UINT8                     ClassCode[3];
   UINT32                    VendorAndDeviceId;
+  EFI_LOADED_IMAGE_PROTOCOL *LoadedImage;
 
   //
   // Check whether device path is valid
@@ -862,6 +863,35 @@ NvmExpressDriverBindingSupported (
     Status = EFI_UNSUPPORTED;
     goto Done;
   }
+
+  /*
+   * Limit the driver to be used only on the FW image file
+   * it was originally coming from
+   */
+  Status = gBS->OpenProtocol (
+                This->ImageHandle,
+                &gEfiLoadedImageProtocolGuid,
+                (VOID **) &LoadedImage,
+                This->DriverBindingHandle,
+                This->ImageHandle,
+                EFI_OPEN_PROTOCOL_GET_PROTOCOL
+                );
+  if (EFI_ERROR (Status)) {
+    goto Done;
+  }
+
+  gBS->CloseProtocol (
+       This->ImageHandle,
+       &gEfiLoadedImageProtocolGuid,
+       This->DriverBindingHandle,
+       This->ImageHandle
+       );
+
+  if (LoadedImage->DeviceHandle != Controller) {
+    Status = EFI_UNSUPPORTED;
+    goto Done;
+  }
+
 
 Done:
   gBS->CloseProtocol (
