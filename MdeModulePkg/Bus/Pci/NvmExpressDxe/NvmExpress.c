@@ -9,6 +9,8 @@
 
 #include "NvmExpress.h"
 
+#define MELLANOX_BLUEFIELD_VENDOR_DEVICE_ID 0xA2D215B3
+
 //
 // NVM Express Driver Binding Protocol Instance
 //
@@ -748,6 +750,7 @@ NvmExpressDriverBindingSupported (
   EFI_DEVICE_PATH_PROTOCOL  *ParentDevicePath;
   EFI_PCI_IO_PROTOCOL       *PciIo;
   UINT8                     ClassCode[3];
+  UINT32                    VendorAndDeviceId;
 
   //
   // Check whether device path is valid
@@ -840,6 +843,24 @@ NvmExpressDriverBindingSupported (
   //
   if ((ClassCode[0] != PCI_IF_NVMHCI) || (ClassCode[1] != PCI_CLASS_MASS_STORAGE_NVM) || (ClassCode[2] != PCI_CLASS_MASS_STORAGE)) {
     Status = EFI_UNSUPPORTED;
+  }
+
+  /*
+   * Check this is a bluefield device, so this driver will
+   * not be used for standard NVMe local devices
+   */
+  Status = PciIo->Pci.Read (
+          PciIo,                      // This
+          EfiPciIoWidthUint32,        // Width
+          PCI_VENDOR_ID_OFFSET,       // Offset
+          1,                          // Count
+          &VendorAndDeviceId          // Buffer
+          );
+  if (EFI_ERROR (Status)) {
+    goto Done;
+  } else if (VendorAndDeviceId != MELLANOX_BLUEFIELD_VENDOR_DEVICE_ID) {
+    Status = EFI_UNSUPPORTED;
+    goto Done;
   }
 
 Done:
